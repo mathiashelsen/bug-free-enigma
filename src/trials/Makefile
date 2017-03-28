@@ -7,3 +7,9 @@ example_states: example_states.l example_states.y
 	bison -d example_states.y
 	flex example_states.l
 	gcc -o $@ example_states.tab.c lex.yy.c -lfl
+
+
+clc: clc.l clc.y
+	bison -d clc.y
+	flex clc.l
+	gcc -o $@ clc.tab.c lex.yy.c -lfl
