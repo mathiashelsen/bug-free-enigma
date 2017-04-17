@@ -4,6 +4,8 @@
 #include <string.h>
 #include <stdint.h>
 
+#define NOPSTR "MOV\tR0\t0\tN\tR0\n"
+
 
 extern int yylineno;
 void yyerror(char *s, ...);
@@ -20,13 +22,16 @@ struct numval{
 };
 
 enum emitType {
-    ADD_NUMBER 
+    NEW_NUMBER,
+    ADD,
+    SUB,
+    UNITARY_MINUS
 };
 
 struct ast *newast(int nodetype, struct ast *l, struct ast *r);
 struct ast *newnum(int number);
 
-double eval(struct ast *);
+void eval(struct ast *);
 
 void treefree(struct ast *);
 

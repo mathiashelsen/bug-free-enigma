@@ -2,6 +2,7 @@
 
 uint32_t stackPtr = 0;
 uint32_t stackDepth = 0;
+FILE *fp;
 
 struct ast *newast(int nodetype, struct ast *l, struct ast *r)
 {
@@ -36,25 +37,26 @@ struct ast *newnum(int value)
     return (struct ast *)a;
 }
 
-double eval(struct ast *a)
+void eval(struct ast *a)
 {
-    double v;
-
     switch(a->nodetype)
     {
-        case 'K':   emit(ADD_NUMBER, a);
+        case 'K':   emit(NEW_NUMBER, a);
                     break;
-        case '+':   v = eval(a->l) + eval(a->r);
+        case '+':   eval(a->r);
+                    eval(a->l);
+                    emit(ADD, NULL); 
                     break;
-        case '-':   v = eval(a->l) - eval(a->r);
+        case '-':   eval(a->r);
+                    eval(a->l);
+                    emit(SUB, NULL);
                     break;
-        case 'M':   v = (-1)*eval(a->l);
+        case 'M':   eval(a->l);
+                    emit(UNITARY_MINUS, NULL);
                     break;
         default:    printf("Error: unknown nodetype in AST\n");
                     
     } 
-
-    return v;
 }
 
 void treefree(struct ast *a)
@@ -87,44 +89,127 @@ void yyerror(char *s, ...)
     fprintf(stderr, "\n");
 }
 
-int main(void)
-{   
-    printf("> ");
+int main(int argc, char **argv)
+{ 
+    if(argc == 1)
+    {
+        fp = fopen("default.ss", "w");
+    } 
+    else if(argc == 2)
+    {
+        fp = fopen(argv[1], "w"); 
+    }
+    else
+    {
+        printf("Too many arguments\n");
+        return -1;
+    }
+
     createPreamble();
+    printf("> ");
     return yyparse();
+
+    fclose(fp);
 }
 
 void emit(enum emitType type, struct ast *data)
 {
+    char *outStr = malloc(sizeof(char)*1024);
     switch(type)
     {
-        case ADD_NUMBER: ;
+        case NEW_NUMBER: ;
             struct numval * ptr = (struct numval *)data;
             if( ptr->number < 2048 )
             {
                 char *outStr = malloc(sizeof(char)*1024);
                 memset(outStr, 0, sizeof(outStr));
 
-                sprintf(outStr, "ADD\tR0\t%d A R1\n", stackDepth);
-                printf("%s", outStr);
-
-                memset(outStr, 0, sizeof(outStr));
-                sprintf(outStr, "MOV\tR0\t%d N R0\n", stackDepth);
-                printf("%s", outStr);
-                printf("%s", outStr);
-
-                memset(outStr, 0, sizeof(outStr));
-                sprintf(outStr, "MOV\tR1\t%d A *R0\n", ptr->number);
-                printf("%s", outStr);
-               
+                stackPtr++;
                 stackDepth++; 
+
+                // Increment stack pointer
+                fprintf(fp, "// Incrementing stack pointer and writing value to MEM\n");
+                sprintf(outStr, "ADD\tR0\t1\tA\tR0\n");
+                fprintf(fp, "%s", outStr);
+
+                // Write value to old pointer
+                memset(outStr, 0, sizeof(outStr));
+                sprintf(outStr, "MOV\tR0\t%d\tA\t*R0\n", ptr->number);
+                fprintf(fp, "%s", outStr);
+
+                fprintf(fp, "%s", NOPSTR);
+                fprintf(fp, "%s", NOPSTR);
+               
                 free(outStr);
             }
             else
             {
                 yyerror("Error creating number, larger than IMM size in opcode! Number input: ", ptr->number); 
             }
+            break;
+        case ADD: ;
+            // Add the two numbers that are on top of the stack
+            memset(outStr, 0, sizeof(outStr));
+
+            fprintf(fp, "// Signed add of top two numbers from stack\n");
+            sprintf(outStr, "SUB\tR0\t1\tA\tR1\n");
+            fprintf(fp, "%s", outStr);
+            fprintf(fp, "%s", NOPSTR);
+            fprintf(fp, "%s", NOPSTR);
+            
+            memset(outStr, 0, sizeof(outStr));
+            sprintf(outStr, "ADDS\t*R0\t*R1\tA\tR1\n");
+            fprintf(fp, "%s", outStr);
+            memset(outStr, 0, sizeof(outStr));
+            sprintf(outStr, "MOV\tR1\tR1\tA\tR0\n");
+            fprintf(fp, "%s", outStr);
+            fprintf(fp, "%s", NOPSTR);
+            fprintf(fp, "%s", NOPSTR);
+
+            stackPtr--;
+            stackDepth--;
+
+            break;
+        case SUB: ;
+            // Add the two numbers that are on top of the stack
+            memset(outStr, 0, sizeof(outStr));
+
+            fprintf(fp, "// Signed add of top two numbers from stack\n");
+            sprintf(outStr, "SUB\tR0\t1\tA\tR1\n");
+            fprintf(fp, "%s", outStr);
+            fprintf(fp, "%s", NOPSTR);
+            fprintf(fp, "%s", NOPSTR);
+            
+            memset(outStr, 0, sizeof(outStr));
+            sprintf(outStr, "SUBS\t*R0\t*R1\tA\tR1\n");
+            fprintf(fp, "%s", outStr);
+            memset(outStr, 0, sizeof(outStr));
+            sprintf(outStr, "MOV\tR1\tR1\tA\tR0\n");
+            fprintf(fp, "%s", outStr);
+            fprintf(fp, "%s", NOPSTR);
+            fprintf(fp, "%s", NOPSTR);
+
+            stackPtr--;
+            stackDepth--;
+
+            break;
+        case UNITARY_MINUS: ;
+            memset(outStr, 0, sizeof(outStr));
+
+            fprintf(fp, "// Unitary minus on last number of stack\n");
+            sprintf(outStr, "MOV\tR0\t0\tA\tR10\n");
+            fprintf(fp, "%s", outStr);
+            fprintf(fp, "%s", NOPSTR);
+            fprintf(fp, "%s", NOPSTR);
+
+            memset(outStr, 0, sizeof(outStr));
+            sprintf(outStr, "SUBS\tR10\t*R0\tA\t*R0\n");
+            fprintf(fp, "%s", outStr);
+            fprintf(fp, "%s", NOPSTR);
+            fprintf(fp, "%s", NOPSTR);
+            break;
     }
+    free(outStr);
 }
 
 void createPreamble()
@@ -134,11 +219,11 @@ void createPreamble()
 
     memset(outStr, 0, sizeof(outStr));
     sprintf(outStr, "MOV\tR0\t%d A R0\n", stackPtr);
-    printf("%s", outStr);
+    fprintf(fp, "%s", outStr);
 
     memset(outStr, 0, sizeof(outStr));
     sprintf(outStr, "MOV\tR0\t%d N R0\n", stackPtr);
-    printf("%s", outStr);
-    printf("%s", outStr);
+    fprintf(fp, "%s", outStr);
+    fprintf(fp, "%s", outStr);
     
 }
