@@ -31,3 +31,5 @@ double eval(struct ast *);
 void treefree(struct ast *);
 
 void emit(enum emitType type, struct ast *data);
+
+void createPreamble();

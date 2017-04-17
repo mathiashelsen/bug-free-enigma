@@ -90,6 +90,7 @@ void yyerror(char *s, ...)
 int main(void)
 {   
     printf("> ");
+    createPreamble();
     return yyparse();
 }
 
@@ -124,4 +125,20 @@ void emit(enum emitType type, struct ast *data)
                 yyerror("Error creating number, larger than IMM size in opcode! Number input: ", ptr->number); 
             }
     }
+}
+
+void createPreamble()
+{
+    // We put R0 to the initial stackPtr;
+    char *outStr = malloc(sizeof(char)*1024);
+
+    memset(outStr, 0, sizeof(outStr));
+    sprintf(outStr, "MOV\tR0\t%d A R0\n", stackPtr);
+    printf("%s", outStr);
+
+    memset(outStr, 0, sizeof(outStr));
+    sprintf(outStr, "MOV\tR0\t%d N R0\n", stackPtr);
+    printf("%s", outStr);
+    printf("%s", outStr);
+    
 }
