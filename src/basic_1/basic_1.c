@@ -43,7 +43,7 @@ struct ast *newnum(int value)
  * Idea for implementation: eval returns int/ptr where result is stored
  * "emit" requires at most 2 ptrs, because all operations require 0, 1 or 2
  * inputs. Would be very nice if "emit" would also send out where it stored
- * the results.
+ * the results. Eval might also require input
  * Assignments always go onto the stack. Intermediate results go into the
  * registers: [R8, R12]. E.g., LHS = R8, RHS = R9, result -> R8 or R9.
  * E.g.: y = x+(x+5): x -> R8, 5 -> R9, (x+5)->R9, x->R8, x+(x+5)-> y
