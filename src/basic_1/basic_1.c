@@ -48,6 +48,8 @@ struct ast *newnum(int value)
  * registers: [R8, R12]. E.g., LHS = R8, RHS = R9, result -> R8 or R9.
  * E.g.: y = x+(x+5): x -> R8, 5 -> R9, (x+5)->R9, x->R8, x+(x+5)-> y
  * where y would go onto the stack, x would be retrieved from the stack.
+ * We also need to indicate if the registers hold the value (e.g. LHS = R8),
+ * or point to the memory address: e.g. x->R8, where R8 holds the address
  */
 
 int eval(struct ast *a)
