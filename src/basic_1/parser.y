@@ -8,36 +8,37 @@
 
 %union{
     struct ast *a;
-    double d;
+    int d;
+    struct symbol *s;
+    struct symlist *sl;
 }
 
 %token <d> NUMBER
+%token <s> NAME
 %token EOL
 
-%type <a> exp term
+%type <a> exp 
+
+%right '='
+%left '+' '-'
+%nonassoc '|' UMINUS
 
 %%
 
 calclist:
     | calclist exp EOL {
         eval($2);
-        treefree($2);
-        printf("> ");
         }
     | calclist EOL {
-        printf("> ");
         }
     ;
 
-exp: term 
-    | exp '+' term { $$ = newast('+', $1, $3); }
-    | exp '-' term { $$ = newast('-', $1, $3); }
-    ;
-
-term: NUMBER        { $$ = newnum($1); }
-    | '|' term      { $$ = newast('|', $2, NULL); }
+exp: exp '+' exp   { $$ = newast('+', $1, $3); }
+    | exp '-' exp   { $$ = newast('-', $1, $3); }
     | '(' exp ')'   { $$ = $2; }
-    | '-' term      { $$ = newast('M', $2, NULL); }
+    | NUMBER        { $$ = newnum($1); }
+    | NAME          { $$ = newref($1); }
+    | NAME '=' exp  { $$ = newasgn($1, $3); }
     ;
 
 %%

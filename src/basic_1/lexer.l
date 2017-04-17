@@ -8,10 +8,12 @@ EXP ([Ee][-+]?[0-9]+)
 
 %%
 
+"=" |
 "+" |
 "-" |
 "(" |
 ")"     { return yytext[0]; }
+[a-zA-Z] { yylval.s = lookup(yytext); return NAME; }
 [0-9]+  { yylval.d = atoi(yytext); return NUMBER; }
 \n      { return EOL; }
 "//".*

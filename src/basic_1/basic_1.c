@@ -1,5 +1,6 @@
 #include "basic_1.h"
 
+uint32_t basePtr = 0;
 uint32_t stackPtr = 0;
 uint32_t stackDepth = 0;
 FILE *fp;
@@ -54,6 +55,11 @@ void eval(struct ast *a)
         case 'M':   eval(a->l);
                     emit(UNITARY_MINUS, NULL);
                     break;
+        case 'N':   emit(RECALL_VALUE, a);
+                    break;
+        case '=':   eval( ((struct symasgn *)a)->v );
+                    emit(STORE_VALUE, a);
+                    break;
         default:    printf("Error: unknown nodetype in AST\n");
                     
     } 
@@ -73,6 +79,11 @@ void treefree(struct ast *a)
             treefree(a->l);
         case 'K':
             free(a);
+            break;
+        case 'N':
+            break;
+        case '=':
+            free( ((struct symasgn*)a)->v);
             break;
         default:
             printf("Bad nodetype: %c\n", a->nodetype);
@@ -106,7 +117,6 @@ int main(int argc, char **argv)
     }
 
     createPreamble();
-    printf("> ");
     return yyparse();
 
     fclose(fp);
@@ -115,6 +125,7 @@ int main(int argc, char **argv)
 void emit(enum emitType type, struct ast *data)
 {
     char *outStr = malloc(sizeof(char)*1024);
+    fprintf(fp, "// Stack ptr = %d\n", stackPtr);
     switch(type)
     {
         case NEW_NUMBER: ;
@@ -208,6 +219,29 @@ void emit(enum emitType type, struct ast *data)
             fprintf(fp, "%s", NOPSTR);
             fprintf(fp, "%s", NOPSTR);
             break;
+        case RECALL_VALUE: ;
+            struct symref * symPtr = (struct symref *)data;
+            // Offset from basePtr;
+            int addr = symPtr->s->value;
+            memset(outStr, 0, sizeof(outStr));
+            sprintf(outStr, "MOV\tR0\t%d\tA\tR1\n", addr); 
+            fprintf(fp, "%s", outStr);
+            fprintf(fp, "%s", NOPSTR);
+            fprintf(fp, "%s", NOPSTR);
+            
+            memset(outStr, 0, sizeof(outStr));
+            sprintf(outStr, "MOV\tR0\t*R1\tA\t*R0\n"); 
+            fprintf(fp, "%s", outStr);
+            memset(outStr, 0, sizeof(outStr));
+            sprintf(outStr, "ADD\tR0\t1\tA\tR0\n"); 
+            fprintf(fp, "%s", outStr);
+            fprintf(fp, "%s", NOPSTR);
+            fprintf(fp, "%s", NOPSTR);
+            break;
+        case STORE_VALUE: ;
+            struct symasgn* symAsgnPtr = (struct symasgn*)data;
+            symAsgnPtr->s->value = stackPtr-1;
+            break;
     }
     free(outStr);
 }
@@ -226,4 +260,69 @@ void createPreamble()
     fprintf(fp, "%s", outStr);
     fprintf(fp, "%s", outStr);
     
+}
+
+static unsigned symhash(char *sym)
+{
+    unsigned int hash = 0;
+    unsigned c;
+
+    while( c = *sym++ ) hash = hash*9 ^ c;
+
+    return hash;
+}
+
+struct symbol *lookup(char *sym)
+{
+    struct symbol *sp = &symtab[symhash(sym)%NHASH];
+    int scount = NHASH;
+
+    while(--scount >= 0){
+        if(sp->name && !strcmp(sp->name, sym)) 
+        { 
+            return sp; 
+        }
+
+        if(!sp->name){
+            sp->name = strdup(sym);
+            sp->value = 0;
+            sp->func = NULL;
+            sp->syms = NULL;
+            return sp;
+        }
+
+        if(++sp >= symtab + NHASH) sp = symtab;
+
+    }
+
+    yyerror("Symbol table overflowed\n");
+    abort();
+}
+
+struct ast *newref(struct symbol *s)
+{
+    struct symref *a = malloc(sizeof(struct symref));
+
+    if(!a) {
+        yyerror("Out of space");
+        exit(0);
+    }
+    a->nodetype = 'N';
+    a->s = s;
+    return (struct ast *)a;
+}
+
+struct ast *newasgn(struct symbol *s, struct ast *v)
+{
+    struct symasgn *a = malloc(sizeof(struct symasgn));
+
+    if(!a) {
+        yyerror("out of space");
+        exit(0);
+    }   
+
+    a->nodetype = '=';
+    a->s = s;
+    a->v = v;
+    return (struct ast*)a;
 }
